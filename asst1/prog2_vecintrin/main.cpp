@@ -249,7 +249,35 @@ void clampedExpVector(float* values, int* exponents, float* output, int N) {
   // Your solution should work for any value of
   // N and VECTOR_WIDTH, not just when VECTOR_WIDTH divides N
   //
+  __cs149_vec_float x;
+  __cs149_vec_int y; 
+  __cs149_vec_float result;
+  __cs149_vec_int zero_int = _cs149_vset_int(0);
+  __cs149_vec_int one_int = _cs149_vset_int(1);
+  __cs149_vec_float one_float = _cs149_vset_float(1.f);
+  __cs149_vec_float clamp = _cs149_vset_float(9.999999f);
   
+  __cs149_mask maskActive = _cs149_init_ones();
+  __cs149_mask maskPosExp, maskClamp;
+
+  int num_batch = (N + VECTOR_WIDTH - 1) / VECTOR_WIDTH;
+  for(int i=0;i < num_batch; i++){
+    if(i == num_batch - 1 && N % VECTOR_WIDTH != 0){
+      maskActive = _cs149_init_ones(N % VECTOR_WIDTH);
+    }
+    _cs149_vload_float(x, values + i * VECTOR_WIDTH, maskActive);
+    _cs149_vload_int(y, exponents + i * VECTOR_WIDTH, maskActive);
+    _cs149_vset_float(result, 1.f, maskActive);
+    _cs149_vgt_int(maskPosExp, y, zero_int, maskActive);
+    while(_cs149_cntbits(maskPosExp) > 0){
+      _cs149_vmult_float(result, result, x, maskPosExp);
+      _cs149_vsub_int(y, y, one_int, maskPosExp);
+      _cs149_vgt_int(maskPosExp, y, zero_int, maskPosExp);
+    }
+    _cs149_vgt_float(maskClamp, result, clamp, maskActive);
+    _cs149_vset_float(result, 9.999999f, maskClamp);
+    _cs149_vstore_float(output + i * VECTOR_WIDTH, result, maskActive);
+  }
 }
 
 // returns the sum of all elements in values
@@ -270,11 +298,20 @@ float arraySumVector(float* values, int N) {
   //
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
-  
+  __cs149_vec_float x;
+  __cs149_vec_float sum;
+  __cs149_mask maskAll = _cs149_init_ones();
+  int exp = std::log2(VECTOR_WIDTH);
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
-
+    _cs149_vload_float(x, values+i, maskAll);
+    _cs149_vadd_float(sum, sum, x, maskAll);
   }
-
-  return 0.0;
+  while(exp > 0){
+  _cs149_hadd_float(sum, sum);
+  _cs149_interleave_float(sum, sum);
+  exp--;
+  }
+  
+  return sum.value[0];
 }
 
