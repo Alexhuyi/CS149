@@ -299,7 +299,7 @@ float arraySumVector(float* values, int N) {
   // CS149 STUDENTS TODO: Implement your vectorized version of arraySumSerial here
   //
   __cs149_vec_float x;
-  __cs149_vec_float sum;
+  __cs149_vec_float sum = _cs149_vset_float(0.f);
   __cs149_mask maskAll = _cs149_init_ones();
   int exp = std::log2(VECTOR_WIDTH);
   for (int i=0; i<N; i+=VECTOR_WIDTH) {
