@@ -37,19 +37,19 @@ void workerThreadStart(WorkerArgs * const args) {
     double startTime = CycleTimer::currentSeconds();
     printf("Hello world from thread %d\n", args->threadId);
     
-    // int count;
-    // if (args->height % args->numThreads == 0) {
-    //     count = args->height / args->numThreads;
-    // } else {
-    //     count = args->height / args->numThreads + 1;
-    // };
-    // int startrow = args->threadId * count;
-    // int numrows = std::min(count,(int)args->height - startrow);
-    // mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, startrow, numrows, args->maxIterations, args->output);
+    int count;
+    if (args->height % args->numThreads == 0) {
+        count = args->height / args->numThreads;
+    } else {
+        count = args->height / args->numThreads + 1;
+    };
+    int startrow = args->threadId * count;
+    int numrows = std::min(count,(int)args->height - startrow);
+    mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, startrow, numrows, args->maxIterations, args->output);
     
-    for(int i= args->threadId; i< (int)args->height;i+=args->numThreads){
-        mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, i, 1, args->maxIterations, args->output);
-    }
+    // for(int i= args->threadId; i< (int)args->height;i+=args->numThreads){
+    //     mandelbrotSerial(args->x0, args->y0, args->x1, args->y1, args->width, args->height, i, 1, args->maxIterations, args->output);
+    // }
     
     double endTime = CycleTimer::currentSeconds();
     printf("Thread %d finished in %.3f ms\n", args->threadId, (endTime - startTime) * 1000);
