@@ -5,6 +5,8 @@
 #include <thread>
 #include <mutex>
 #include <condition_variable>
+#include <atomic>
+#include <iostream>
 /*
  * TaskSystemSerial: This class is the student's implementation of a
  * serial task execution engine.  See definition of ITaskSystem in
@@ -40,16 +42,20 @@ class TaskSystemParallelSpawn: public ITaskSystem {
         int num_threads_;
 };
 
-class TaskState{
+class ThreadState{
     public:
-        TaskState();
-        ~TaskState();
+        ThreadState();
+        ~ThreadState();
         int num_total_tasks;
         int done_tasks;
+        int left_tasks;
         IRunnable* runnable;
         std::mutex* mutex;
         std::mutex* finish_mutex;
         std::condition_variable* finish_cond;
+        std::condition_variable* has_task_cond;
+        volatile bool done_pool;
+        // std::atomic<bool> notified;
 };
 
 /*
@@ -67,17 +73,13 @@ class TaskSystemParallelThreadPoolSpinning: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
-        int num_threads_,num_total_tasks,done_tasks,left_tasks;
+        int num_threads_,num_total_tasks,left_tasks;
+        volatile int done_tasks;
         bool done_pool;
         IRunnable* runnable;
         std::thread* threads;
         std::mutex* mutex;
-        void wait_fn();
-        // int num_threads_;
-        // bool done_pool;
-        // std::thread* threads;
-        // TaskState* task_state;
-        // void wait_fn();
+        void wait_fn(int thread_id);
 };
 
 /*
@@ -95,6 +97,10 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         TaskID runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
                                 const std::vector<TaskID>& deps);
         void sync();
+        int num_threads_;
+        std::thread* threads;
+        ThreadState* thread_state;
+        void wait_fn(int thread_id);
 };
 
 #endif
