@@ -107,7 +107,6 @@ TaskID TaskSystemParallelThreadPoolSpinning::runAsyncWithDeps(IRunnable* runnabl
     for (int i = 0; i < num_total_tasks; i++) {
         runnable->runTask(i, num_total_tasks);
     }
-
     return 0;
 }
 
