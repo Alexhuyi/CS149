@@ -126,7 +126,6 @@ ThreadState::ThreadState() {
     this->has_task_cond = new std::condition_variable();
     this->runnable = nullptr;
     this->done_pool = false;
-    this->notified = false;
 }
 
 ThreadState::~ThreadState() {
@@ -276,8 +275,8 @@ void TaskSystemParallelThreadPoolSleeping::wait_fn(int thread_id) {
         thread_state->done_tasks++;
         thread_state->finish_mutex->lock();
         // std::cout<<thread_state->done_tasks<<", id:"<<thread_id<<std::endl;
-        if(thread_state->done_tasks == thread_state->num_total_tasks && thread_state->notified == false){
-            thread_state->notified = true;
+        if(thread_state->done_tasks == thread_state->num_total_tasks ){
+
             thread_state->finish_mutex->unlock();
             thread_state->finish_cond->notify_one();
         }
@@ -306,7 +305,6 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     thread_state->done_tasks = 0;
     thread_state->left_tasks = num_total_tasks;
     thread_state->done_pool = false;
-    thread_state->notified = false;
     thread_state->mutex->unlock();
     
     //put main thread into sleep while worker threads do tasks  

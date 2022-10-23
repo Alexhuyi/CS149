@@ -55,7 +55,6 @@ class ThreadState{
         std::condition_variable* finish_cond;
         std::condition_variable* has_task_cond;
         volatile bool done_pool;
-        std::atomic<bool> notified;
 };
 
 /*
