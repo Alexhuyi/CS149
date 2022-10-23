@@ -210,6 +210,7 @@ TaskSystemParallelThreadPoolSleeping::TaskSystemParallelThreadPoolSleeping(int n
     this->_mutex = new std::mutex();
     this->_task_mutex = new std::mutex();
     this->_condition_variable = new std::condition_variable();
+    this->_finish_cond = new std::condition_variable();
     this->curret_ID = 0;
     for (int i = 0; i < this->num_threads; i++) {
         this->workers[i] = std::thread(&TaskSystemParallelThreadPoolSleeping::wait_for_task,this);
@@ -224,6 +225,9 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     // (requiring changes to tasksys.h).
     //
     this->destroy = true;
+    // this->_mutex->lock();
+    // this->remaining_tasks = 1;
+    // this->_mutex->unlock();
     this->_condition_variable->notify_all();
     for (int t = 0; t < this->num_threads; t++) {
         workers[t].join();
@@ -231,6 +235,7 @@ TaskSystemParallelThreadPoolSleeping::~TaskSystemParallelThreadPoolSleeping() {
     delete this->_mutex;
     delete this->_task_mutex;
     delete this->_condition_variable;
+    delete this->_finish_cond;
 }
 
 void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_total_tasks) {
@@ -245,28 +250,46 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     this->runnable = runnable;
     this->curret_ID = 0;
     this->num_total_tasks = num_total_tasks;
-    this->remaining_tasks = num_total_tasks;
     this->_mutex->unlock();
 
+    this->_task_mutex->lock();
+    this->remaining_tasks = num_total_tasks;
+    this->_task_mutex->unlock();
+    // this->_condition_variable->notify_all();
+
     // Wake up threads, waking up is a bit slow so we can fix that
-    this->_mutex->lock();
-    while (this->num_waiting_threads && this->remaining_tasks) {
-        this->_mutex->unlock();
-        this->_condition_variable->notify_one();
-        this->_mutex->lock();
-    }
-    this->_mutex->unlock();
-    while (this->remaining_tasks) {}
+    // this->_mutex->lock();
+    // while (this->num_waiting_threads && this->remaining_tasks) {
+    //     this->_mutex->unlock();
+    //     this->_condition_variable->notify_one();
+    //     this->_mutex->lock();
+    //     // this->_task_mutex->lock();
+    //     if (!this->num_waiting_threads && this->remaining_tasks != 0) {
+    //         std::cout << "All Threads Awake: " << this->num_waiting_threads << ", " << this->remaining_tasks << std::endl;
+    //         // this->_task_mutex->unlock();
+    //         std::unique_lock<std::mutex> main_lock(*this->_task_mutex);
+    //         this->_finish_cond->wait(main_lock);
+    //         main_lock.unlock();
+    //         break;
+    //     }
+    //     // this->_task_mutex->unlock();
+    // }
+    // this->_mutex->unlock();
+    // while (this->remaining_tasks) {}
+    std::unique_lock<std::mutex> main_lock(*this->_task_mutex);
+    this->_condition_variable->notify_one();
+    this->_finish_cond->wait(main_lock);
+    main_lock.unlock();
     return;
 }
 
 void TaskSystemParallelThreadPoolSleeping::wait_for_task() {
     while (!destroy) {
         std::unique_lock<std::mutex> lock(*this->_mutex);
-        if (!this->num_total_tasks || this->curret_ID >= this->num_total_tasks /*|| this->remaining_tasks <= 0*/) {
-            // Put thread to sleep here
+        if (!this->num_total_tasks || this->curret_ID >= this->num_total_tasks) {
             this->num_waiting_threads++;
             this->_condition_variable->wait(lock);
+            // this->_condition_variable->wait(lock,[&](){return this->remaining_tasks;});
             this->num_waiting_threads--;
             lock.unlock();
             continue;
@@ -278,6 +301,12 @@ void TaskSystemParallelThreadPoolSleeping::wait_for_task() {
         this->runnable->runTask(task_ID, num_tot_tasks);
         _task_mutex->lock();
         this->remaining_tasks--;
+        if (this->remaining_tasks == 0) {
+            // Wake up main thread
+            _task_mutex->unlock();
+            this->_finish_cond->notify_one();
+            continue;
+        }
         _task_mutex->unlock();
     }
     return;

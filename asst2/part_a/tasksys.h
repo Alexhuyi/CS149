@@ -86,6 +86,7 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
     private:
         std::vector<std::thread> workers;
         std::condition_variable* _condition_variable;
+        std::condition_variable* _finish_cond;
         std::mutex* _mutex;
         std::mutex* _task_mutex;
         IRunnable* runnable;
