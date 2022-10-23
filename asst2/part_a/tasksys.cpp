@@ -267,15 +267,13 @@ void TaskSystemParallelThreadPoolSleeping::wait_fn(int thread_id) {
             continue;
         }
         id = thread_state->num_total_tasks- thread_state->left_tasks;
-        // if (id >= thread_state->num_total_tasks) {
-        //     worker_lock.unlock();
-        //     continue;
-        // }
         thread_state->left_tasks--;
         worker_lock.unlock();
         thread_state->runnable->runTask(id, thread_state->num_total_tasks);
-        thread_state->finish_mutex->lock();
+        // std::unique_lock<std::mutex> finish_lock(*thread_state->finish_mutex);
+        // thread_state->finish_mutex->lock();
         thread_state->done_tasks++;
+        thread_state->finish_mutex->lock();
         // std::cout<<thread_state->done_tasks<<", id:"<<thread_id<<std::endl;
         if(thread_state->done_tasks == thread_state->num_total_tasks){
             thread_state->finish_mutex->unlock();
@@ -284,23 +282,6 @@ void TaskSystemParallelThreadPoolSleeping::wait_fn(int thread_id) {
         else{
             thread_state->finish_mutex->unlock();
         }
-        // if (id< thread_state->num_total_tasks){
-        //     thread_state->runnable->runTask(id, thread_state->num_total_tasks);
-        //     thread_state->finish_mutex->lock();
-        //     thread_state->done_tasks++;
-        //     // std::cout<<thread_state->done_tasks<<", id:"<<thread_id<<std::endl;
-        //     if(thread_state->done_tasks == thread_state->num_total_tasks){
-        //         thread_state->finish_mutex->unlock();
-        //         thread_state->finish_cond->notify_all();
-        //     }
-        //     else{
-        //         thread_state->finish_mutex->unlock();
-        //     }
-        // }
-        
-        // if(thread_state->done_tasks >= thread_state->num_total_tasks){
-        //     thread_state->finish_cond->notify_one();
-        // }
     }
 }
 
@@ -324,15 +305,10 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     thread_state->left_tasks = num_total_tasks;
     thread_state->done_pool = false;
     thread_state->mutex->unlock();
+    
+    // while(thread_state->done_tasks < thread_state->num_total_tasks){
+    {    std::unique_lock<std::mutex> lk(*thread_state->finish_mutex);
 
-    // Release the mutex before calling `notify_all()` to make sure
-    // waiting threads have a chance to make progress.
-    if(thread_state->done_tasks < thread_state->num_total_tasks){
-        std::unique_lock<std::mutex> lk(*thread_state->finish_mutex);
-        // if(thread_state->done_tasks < thread_state->num_total_tasks){
-        //     thread_state->has_task_cond->notify_all();
-        //     thread_state->finish_cond->wait(lk);
-        // }
         thread_state->has_task_cond->notify_all();
         thread_state->finish_cond->wait(lk); 
         lk.unlock();

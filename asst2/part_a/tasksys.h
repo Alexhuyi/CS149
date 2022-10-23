@@ -47,7 +47,7 @@ class ThreadState{
         ThreadState();
         ~ThreadState();
         int num_total_tasks;
-        int done_tasks;
+        std::atomic<int> done_tasks;
         int left_tasks;
         IRunnable* runnable;
         std::mutex* mutex;
