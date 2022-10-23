@@ -126,6 +126,7 @@ ThreadState::ThreadState() {
     this->has_task_cond = new std::condition_variable();
     this->runnable = nullptr;
     this->done_pool = false;
+    this->notified = false;
 }
 
 ThreadState::~ThreadState() {
@@ -275,7 +276,8 @@ void TaskSystemParallelThreadPoolSleeping::wait_fn(int thread_id) {
         thread_state->done_tasks++;
         thread_state->finish_mutex->lock();
         // std::cout<<thread_state->done_tasks<<", id:"<<thread_id<<std::endl;
-        if(thread_state->done_tasks == thread_state->num_total_tasks){
+        if(thread_state->done_tasks == thread_state->num_total_tasks && thread_state->notified == false){
+            thread_state->notified = true;
             thread_state->finish_mutex->unlock();
             thread_state->finish_cond->notify_one();
         }
@@ -304,16 +306,15 @@ void TaskSystemParallelThreadPoolSleeping::run(IRunnable* runnable, int num_tota
     thread_state->done_tasks = 0;
     thread_state->left_tasks = num_total_tasks;
     thread_state->done_pool = false;
+    thread_state->notified = false;
     thread_state->mutex->unlock();
     
-    // while(thread_state->done_tasks < thread_state->num_total_tasks){
-    {    std::unique_lock<std::mutex> lk(*thread_state->finish_mutex);
-
-        thread_state->has_task_cond->notify_all();
-        thread_state->finish_cond->wait(lk); 
-        lk.unlock();
-    }
-    // std::cout<<TaskSystemParallelThreadPoolSleeping::name()<<std::endl;
+    //put main thread into sleep while worker threads do tasks  
+    std::unique_lock<std::mutex> lk(*thread_state->finish_mutex);
+    thread_state->has_task_cond->notify_all();
+    thread_state->finish_cond->wait(lk); 
+    lk.unlock();
+    
 }
 
 TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnable, int num_total_tasks,
