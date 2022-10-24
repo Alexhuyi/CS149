@@ -262,11 +262,11 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
         lock.unlock();
         searchReadyTaskGroup();
         lock.lock();
-        for(auto it = left_tasks.begin(); it != left_tasks.end(); it++){
-            if (it->second != 0){
-                std::cout<<"left task group: "<<it->first<<" has "<<it->second<<" left tasks."<<std::endl;
-            }
-        }
+        // for(auto it = left_tasks.begin(); it != left_tasks.end(); it++){
+        //     if (it->second != 0){
+        //         std::cout<<"left task group: "<<it->first<<" has "<<it->second<<" left tasks."<<std::endl;
+        //     }
+        // }
         done = left_tasks.empty();//check if all task groups are finished
         lock.unlock();
     }
