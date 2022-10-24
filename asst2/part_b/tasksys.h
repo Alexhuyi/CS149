@@ -114,6 +114,7 @@ class TaskSystemParallelThreadPoolSleeping: public ITaskSystem {
         std::queue<TaskID> finished_task_groups;
         std::map<TaskID, WaitingTask*> task_group_id_to_task_group; //task group id -> task group
         std::map<TaskID, std::set<TaskID> > task_group_deps; //task group id -> set of task group ids which this task group depends on
+        std::map<TaskID, std::set<TaskID> > dependents; //task group id -> set of task group ids which depend on this task group
         std::map<TaskID, int> left_tasks; //task group id -> number of tasks left to finish in each group
         std::mutex* finished_task_groups_mutex;
         std::mutex* run_task_mutex;

@@ -199,6 +199,7 @@ TaskID TaskSystemParallelThreadPoolSleeping::runAsyncWithDeps(IRunnable* runnabl
     else{
         for(TaskID dep_task:deps){
             task_group_deps[current_task_group_id].insert(dep_task);
+            dependents[dep_task].insert(current_task_group_id);
             // std::cout<<"group id :"<<current_task_group_id<<"'s dep_task :"<<dep_task<<std::endl;
         }
     }
@@ -219,7 +220,7 @@ void TaskSystemParallelThreadPoolSleeping::sleepingthread_func(){
         worker_lock.unlock();
         // std::cout<<"run task "<<task->current_task_id<<" of task group"<<task->task_group_id<<std::endl;
         task->runnable->runTask(task->current_task_id, task->num_total_tasks);
-
+        
         finished_task_groups_mutex->lock();
         // std::cout<<"task group"<<task->task_group_id<<" left task "<<left_tasks[task->task_group_id]<<std::endl;
         left_tasks[task->task_group_id]--;
@@ -241,7 +242,7 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
     // TODO: CS149 students will modify the implementation of this method in Part B.
     //
     searchReadyTaskGroup();
-    bool done = false;
+    volatile bool done = false;
     while(done==false){
         std::unique_lock<std::mutex> lock(*finished_task_groups_mutex);
         finished_task_groups_cv->wait(lock, [this] { return !finished_task_groups.empty(); });
@@ -250,12 +251,13 @@ void TaskSystemParallelThreadPoolSleeping::sync() {
         while(!finished_task_groups.empty()){
             // std::cout<<"finished task group "<<finished_task_groups.front()<<std::endl;
             int task_group_id = finished_task_groups.front();
-            left_tasks.erase(left_tasks.find(task_group_id));
+            // left_tasks.erase(left_tasks.find(task_group_id));
+            left_tasks.erase(task_group_id);
             finished_task_groups.pop();
             lock.unlock();
             //remove depenency on this task group
-            for(auto it = task_group_deps.begin(); it != task_group_deps.end(); it++){
-                it->second.erase(task_group_id);
+            for(auto it = dependents[task_group_id].begin(); it != dependents[task_group_id].end(); it++){
+                task_group_deps[*it].erase(task_group_id);
             }
             lock.lock();
         }
