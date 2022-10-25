@@ -153,23 +153,27 @@ TestResults yourTest(ITaskSystem* t, bool do_async, int num_elements, int num_bu
 }
 
 TestResults nchoosekSimpleTest(ITaskSystem* t) {
-    return yourTest(t, false, 1000, 1, 5);
+    return yourTest(t, false, 1000, 1, 50);
 }
 
 TestResults nchoosekManyLaunchTest(ITaskSystem* t) {
-    return yourTest(t, false, 1000, 5, 1);
+    return yourTest(t, false, 10000, 100, 1);
 }
 
 TestResults nchoosekManyElementTest(ITaskSystem* t) {
-    return yourTest(t, false, 10000, 5, 5);
+    return yourTest(t, false, 1000000, 5, 5);
 }
 
 TestResults nchoosekHeavyRecursiveTest(ITaskSystem* t) {
-    return yourTest(t, false, 1000, 2, 500);
+    return yourTest(t, false, 100000, 2, 5000);
 }
 
 TestResults nchoosekHeavyTest(ITaskSystem* t) {
     return yourTest(t, false, 100000, 10, 1000);
+}
+
+TestResults nchoosekHeavyAsyncTest(ITaskSystem* t) {
+    return yourTest(t, true, 100000, 10, 1000);
 }
 
 
