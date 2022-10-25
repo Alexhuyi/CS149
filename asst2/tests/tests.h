@@ -61,11 +61,120 @@ typedef struct {
  * Implement your task here
 */
 class YourTask : public IRunnable {
+    // Recursively calculate n choose k
     public:
-        YourTask() {}
+        int num_elements_;
+        int* array_;
+        int k_;
+
+        YourTask(int num_elements, int* array, int k)
+            : num_elements_(num_elements), array_(array), k_(k) {}
         ~YourTask() {}
-        void runTask(int task_id, int num_total_tasks) {}
+        int choose(int n) {
+            return choose_recursive(n, k_);
+        }
+        static int choose_recursive(int n, int k_rec) {
+            if (k_rec > n) return 0;
+            if (!k_rec) return 1;
+            return (n*choose_recursive(n-1, k_rec-1))/k_rec;
+        }
+        void runTask(int task_id, int num_total_tasks) {
+             // handle case where num_elements is not evenly divisible by num_total_tasks
+            int elements_per_task = (num_elements_ + num_total_tasks-1) / num_total_tasks;
+            int start_el = elements_per_task * task_id;
+            int end_el = std::min(start_el + elements_per_task, num_elements_);
+
+            for (int i = start_el; i < end_el; i++) {
+                array_[i] = choose(array_[i]);
+            }
+        }
 };
+/*
+ * Implement your test here. Call this function from a wrapper that passes in
+ * do_async and num_elements. See `simpleTest`, `simpleTestSync`, and
+ * `simpleTestAsync` as an example.
+ */
+TestResults yourTest(ITaskSystem* t, bool do_async, int num_elements, int num_bulk_task_launches, int start_k) {
+    // TODO: initialize your input and output buffers
+    int* output = new int[num_elements];
+    for (int i=0; i<num_elements; i++) {
+        output[i] = i;
+    }
+
+    // TODO: instantiate your bulk task launches
+    std::vector<YourTask*> ncktasks(num_bulk_task_launches);
+    for (int i = 0; i < num_bulk_task_launches; i++) {
+        ncktasks[i] = new YourTask(num_elements, output, start_k+i);
+    }
+    // Run the test
+    double start_time = CycleTimer::currentSeconds();
+    TaskID prev_task_id;
+    for (int i=0; i<num_bulk_task_launches; i++) {
+        if (do_async) {
+            // TODO:
+            // initialize dependency vector
+            std::vector<TaskID> deps;
+            if (i > 0) {
+                deps.push_back(prev_task_id);
+            }
+            prev_task_id = t->runAsyncWithDeps(
+                ncktasks[i], num_elements, deps);
+        } else {
+            // TODO: make calls to t->run
+            t->run(ncktasks[i], num_elements);
+        }
+    }
+    if (do_async)
+        t->sync();
+    double end_time = CycleTimer::currentSeconds();
+
+    // Correctness validation
+    TestResults results;
+    results.passed = true;
+
+    for (int i=0; i<num_elements; i++) {
+        int value = i; // TODO: initialize value
+        for (int j=0; j<num_bulk_task_launches; j++) {
+            // TODO: update value as expected
+            value = YourTask::choose_recursive(value,start_k+j);
+        }
+        int expected = value;
+        if (output[i] != expected) {
+            results.passed = false;
+            printf("%d: %d expected=%d\n", i, output[i], expected);
+            break;
+        }
+    }
+    results.time = end_time - start_time;
+
+    delete [] output;
+
+    return results;
+}
+
+TestResults nchoosekSimpleTest(ITaskSystem* t) {
+    return yourTest(t, false, 1000, 1, 50);
+}
+
+TestResults nchoosekManyLaunchTest(ITaskSystem* t) {
+    return yourTest(t, false, 10000, 100, 1);
+}
+
+TestResults nchoosekManyElementTest(ITaskSystem* t) {
+    return yourTest(t, false, 1000000, 5, 5);
+}
+
+TestResults nchoosekHeavyRecursiveTest(ITaskSystem* t) {
+    return yourTest(t, false, 100000, 2, 5000);
+}
+
+TestResults nchoosekHeavyTest(ITaskSystem* t) {
+    return yourTest(t, false, 100000, 10, 1000);
+}
+
+TestResults nchoosekHeavyAsyncTest(ITaskSystem* t) {
+    return yourTest(t, true, 100000, 10, 1000);
+}
 /*
  * Implement your test here. Call this function from a wrapper that passes in
  * do_async and num_elements. See `simpleTest`, `simpleTestSync`, and
