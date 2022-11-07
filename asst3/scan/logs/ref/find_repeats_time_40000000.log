@@ -6,6 +6,5 @@ Device 0: Tesla T4
    CUDA Cap:   7.5
 ---------------------------------------------------------
 Array size: 40000000
-multiplier:1, two_d:33554432, N:40000000
-Student GPU time: 30.721 ms
-Scan outputs are correct!
+Student GPU time: 42.839 ms
+Find_repeats outputs are correct!

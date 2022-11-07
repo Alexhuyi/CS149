@@ -5,6 +5,6 @@ Device 0: Tesla T4
    Global mem: 15110 MB
    CUDA Cap:   7.5
 ---------------------------------------------------------
-Array size: 1000000
-Student GPU time: 0.805 ms
-Scan outputs are correct!
+Array size: 20000000
+Student GPU time: 16.173 ms
+Find_repeats outputs are correct!

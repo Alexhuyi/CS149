@@ -196,24 +196,26 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
 }
 
 //in-place neighbor compare
-__global__ void neighbor_cmp(int* array, int length){
+__global__ void neighbor_cmp(int* input, int* output, int length){
     int threadId = threadIdx.x + blockDim.x * blockIdx.x;
     if(threadId < length - 1){
-        array[threadId] = array[threadId]==array[threadId + 1] ? 1 : 0;
+        output[threadId] = input[threadId]==input[threadId + 1] ? 1 : 0;
     }
 }
 
 
-__device__ int d_repeat_length; //store the repeat array length;
+__device__ int d_repeat_length = 0; //store the repeat array length;
 //
 __global__ void set_last_element(int* input, int* output, int length){
     if( input[length-1] != input[length-2]){
         output[length-1] = output[length-2];
         d_repeat_length = output[length-2];
+        // printf("repeat1:%d\n",d_repeat_length);
     }
     else{
         output[length-1] = -1;
         d_repeat_length = output[length-2]+1;
+        // printf("repeat:%d\n",d_repeat_length);
     }
 }
 
@@ -224,6 +226,14 @@ __global__ void repeat(int* array, int length){
         array[array[threadId]] = threadId;
     } 
    } 
+}
+
+__global__ void helper(int* array, int length){
+    for(int i =0; i < length;i++){
+        printf("%d ",array[i]);
+    }
+    printf("length: %d", length);
+    printf("\n");
 }
 // find_repeats --
 //
@@ -249,15 +259,24 @@ int find_repeats(int* device_input, int length, int* device_output) {
     int BLOCKS_PER_GRID;
     int repeat_length;
     if( length <= THREADS_PER_BLOCK){
-        neighbor_cmp<<<1,length-1>>>(device_output,length);//output:{0,1,0,1,1,0,0,0,1}
+        // helper<<<1,1>>>(device_input,length);
+        neighbor_cmp<<<1,length-1>>>(device_input,device_output,length);//output:{0,1,0,1,1,0,0,0,1}
+        // helper<<<1,1>>>(device_output,length);
         exclusive_scan(device_output,length-1,device_output);//output:{0,0,1,1,2,3,3,3,3}
+        // helper<<<1,1>>>(device_output,length);
         set_last_element<<<1,1>>>(device_input,device_output,length);//output:{0,0,1,1,2,3,3,3,3,-1},d_repeat_length=4
+        // helper<<<1,1>>>(device_output,length);
         repeat<<<1,length-1>>>(device_output,length);//output:{1,3,4,8,2,3,3,3,3,-1}
+        // helper<<<1,1>>>(device_output,length);
     }
     else{
-
+        BLOCKS_PER_GRID = ( length + THREADS_PER_BLOCK -1) / THREADS_PER_BLOCK;
+        neighbor_cmp<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(device_input, device_output, length);
+        exclusive_scan(device_output, length-1, device_output);
+        set_last_element<<<1,1>>>(device_input,device_output,length);
+        repeat<<<BLOCKS_PER_GRID,THREADS_PER_BLOCK>>>(device_output,length);
     }
-    cudaMemcpyFromSymbol(&repeat_length,"d_repeat_length",sizeof(int),0,cudaMemcpyDeviceToHost);
+    cudaMemcpyFromSymbol(&repeat_length,d_repeat_length,sizeof(int),0,cudaMemcpyDeviceToHost);
     return repeat_length; 
 }
 
