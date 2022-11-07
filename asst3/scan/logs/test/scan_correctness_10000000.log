@@ -1,0 +1,11 @@
+---------------------------------------------------------
+Found 1 CUDA devices
+Device 0: Tesla T4
+   SMs:        40
+   Global mem: 15110 MB
+   CUDA Cap:   7.5
+---------------------------------------------------------
+Array size: 10000000
+multiplier:1, two_d:8388608, N:10000000
+Student GPU time: 24.256 ms
+Scan outputs are correct!

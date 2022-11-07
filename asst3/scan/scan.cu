@@ -27,6 +27,27 @@ static inline int nextPow2(int n) {
     return n;
 }
 
+__global__ void upsweep(int* array, int multiplier){
+    int threadId = threadIdx.x + blockDim.x * blockIdx.x;
+    int index_1 = multiplier * (2 * threadId + 1) - 1;
+    int index_2 = multiplier * (2 * threadId + 2) - 1;
+    array[index_2] += array[index_1];
+}
+
+__global__ void downsweep(int* array, int multiplier){
+    int threadId = threadIdx.x + blockDim.x * blockIdx.x;
+    int index_1 = multiplier * (2 * threadId + 1) - 1;
+    int index_2 = multiplier * (2 * threadId + 2) - 1;
+    int t = array[index_1];
+    array[index_1] = array[index_2];
+    array[index_2] += t;
+
+}
+
+__global__ void set_last_zero(int* array, int N){
+    array[N - 1] = 0;
+}
+
 // exclusive_scan --
 //
 // Implementation of an exclusive scan on global memory array `input`,
@@ -53,9 +74,43 @@ void exclusive_scan(int* input, int N, int* result)
     // on the CPU.  Your implementation will need to make multiple calls
     // to CUDA kernel functions (that you must write) to implement the
     // scan.
+    int multiplier = 1;
+    int BLOCKS_PER_GRID;
+    int rounded_N = nextPow2(N);
+    //upsweep
+    int two_d = rounded_N / 2;
+    while( two_d > THREADS_PER_BLOCK){
+        BLOCKS_PER_GRID = two_d / THREADS_PER_BLOCK;
+        upsweep<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(result, multiplier);
+        two_d /= 2;
+        multiplier *= 2;
+    }
+    while( two_d > 0 ){
+        upsweep<<<1, two_d>>>(result, multiplier);
+        two_d /= 2;
+        multiplier *= 2;
+    }
 
+    set_last_zero<<<1,1>>>(result,rounded_N);
 
+    //downsweep
+    two_d = 1;
+    while( two_d <= THREADS_PER_BLOCK){
+        multiplier /= 2;
+        downsweep<<<1, two_d>>>(result, multiplier);
+        two_d *=2;
+    }
+    while( two_d < rounded_N){
+        multiplier /= 2;
+        // if(two_d >= N/2){
+        //     printf("multiplier:%d, two_d:%d, N:%d\n",multiplier,two_d,N);
+        // }
+        BLOCKS_PER_GRID = two_d / THREADS_PER_BLOCK;
+        downsweep<<<BLOCKS_PER_GRID, THREADS_PER_BLOCK>>>(result, multiplier);
+        two_d *= 2;
+    }
 }
+
 
 
 //
@@ -140,7 +195,36 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
     return overallDuration; 
 }
 
+//in-place neighbor compare
+__global__ void neighbor_cmp(int* array, int length){
+    int threadId = threadIdx.x + blockDim.x * blockIdx.x;
+    if(threadId < length - 1){
+        array[threadId] = array[threadId]==array[threadId + 1] ? 1 : 0;
+    }
+}
 
+
+__device__ int d_repeat_length; //store the repeat array length;
+//
+__global__ void set_last_element(int* input, int* output, int length){
+    if( input[length-1] != input[length-2]){
+        output[length-1] = output[length-2];
+        d_repeat_length = output[length-2];
+    }
+    else{
+        output[length-1] = -1;
+        d_repeat_length = output[length-2]+1;
+    }
+}
+
+__global__ void repeat(int* array, int length){
+   int threadId = threadIdx.x + blockDim.x * blockIdx.x;
+   if(threadId < length-1){
+    if( array[threadId] != array[threadId + 1]){
+        array[array[threadId]] = threadId;
+    } 
+   } 
+}
 // find_repeats --
 //
 // Given an array of integers `device_input`, returns an array of all
@@ -160,8 +244,21 @@ int find_repeats(int* device_input, int length, int* device_output) {
     // exclusive_scan function with them. However, your implementation
     // must ensure that the results of find_repeats are correct given
     // the actual array length.
+    //e.g input:{1,2,2,1,1,1,3,5,3,3}
+    int rounded_length = nextPow2(length);
+    int BLOCKS_PER_GRID;
+    int repeat_length;
+    if( length <= THREADS_PER_BLOCK){
+        neighbor_cmp<<<1,length-1>>>(device_output,length);//output:{0,1,0,1,1,0,0,0,1}
+        exclusive_scan(device_output,length-1,device_output);//output:{0,0,1,1,2,3,3,3,3}
+        set_last_element<<<1,1>>>(device_input,device_output,length);//output:{0,0,1,1,2,3,3,3,3,-1},d_repeat_length=4
+        repeat<<<1,length-1>>>(device_output,length);//output:{1,3,4,8,2,3,3,3,3,-1}
+    }
+    else{
 
-    return 0; 
+    }
+    cudaMemcpyFromSymbol(&repeat_length,"d_repeat_length",sizeof(int),0,cudaMemcpyDeviceToHost);
+    return repeat_length; 
 }
 
 
