@@ -108,10 +108,10 @@ void saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultar
 		errCode, cudaGetErrorString(errCode));
     }
     double kernalDuration = endKernelTime - startKernelTime;
-    printf("Kernel execution time: %f ms\n", kernalDuration * 1000);
     double overallDuration = endTime - startTime;
+    printf("GPU BW: %.3f ms\t\t[%.3f GB/s]\n",1000.f*kernalDuration,GBPerSec(totalBytes,kernalDuration));
     printf("Effective BW by CUDA saxpy: %.3f ms\t\t[%.3f GB/s]\n", 1000.f * overallDuration, GBPerSec(totalBytes, overallDuration));
-
+    
     //
     // CS149 TODO: free memory buffers on the GPU using cudaFree
     //
