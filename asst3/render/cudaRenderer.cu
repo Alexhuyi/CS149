@@ -540,12 +540,18 @@ __global__ void kernelRenderPixels() {
     __shared__ uint prefixSumOutput[BLOCKSIZE];//inclusive sum of the prefixSumInput
     __shared__ uint prefixSumScratch[2 * BLOCKSIZE];
     __shared__ uint inBlock[BLOCKSIZE];//the conservative circle in the block
-    
+    // float3 p;
+    // float rad;
+    // int index3;
      
     for (int index = 0; index < cuConstRendererParams.numCircles; index += BlOCKSIZE) {
         int circleIndex = index + tid;
         //circle in box conservative test 
         circleInBlockConservative(tid,circleIndex, boxL, boxR, boxT, boxB, prefixSumInput);
+        // index3 = 3 * circleIndex;
+        // p = *(float3*)(&cuConstRendererParams.position[index3]);
+        // rad = cuConstRendererParams.radius[circleIndex];
+        // prefixSumInput[tid] = static_cast<uint>(circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB));
         __syncthreads();
         //inclusive scan of the prefixSumInput to get the index of the circle in the block--conservative test
         sharedMemInclusiveScan(tid, prefixSumInput, prefixSumOutput, prefixSumScratch,BlOCKSIZE);
@@ -558,36 +564,36 @@ __global__ void kernelRenderPixels() {
         getcircleIdxConservative(tid, circleIndex, prefixSumOutput, inBlock);
         __syncthreads();
 
-        // exact circle in box test
-        if(tid >= numCirclesInBlockConservative){
-            prefixSumInput[tid] = 0;
-        }
-        else{
-            circleinBoxExact(tid, inBlock[tid], boxL, boxR, boxT, boxB, prefixSumInput);
-        }
-        __syncthreads();
-        //inclusive scan of the prefixSumInput to get the index of the circle in the block-- exact test
-        sharedMemInclusiveScan(tid, prefixSumInput, prefixSumOutput, prefixSumScratch,BlOCKSIZE);
-        __syncthreads();
-        int numCirclesInBlockExact = prefixSumOutput[numCirclesInBlockConservative - 1];
-        //get the circle index in the block -- exact
-        getcircleIdxTrue(tid, prefixSumInput, prefixSumOutput, inBlock);//exact idx is in prefixSumInput
-        __syncthreads();
+        // // exact circle in box test
+        // if(tid >= numCirclesInBlockConservative){
+        //     prefixSumInput[tid] = 0;
+        // }
+        // else{
+        //     circleinBoxExact(tid, inBlock[tid], boxL, boxR, boxT, boxB, prefixSumInput);
+        // }
+        // __syncthreads();
+        // //inclusive scan of the prefixSumInput to get the index of the circle in the block-- exact test
+        // sharedMemInclusiveScan(tid, prefixSumInput, prefixSumOutput, prefixSumScratch,BlOCKSIZE);
+        // __syncthreads();
+        // int numCirclesInBlockExact = prefixSumOutput[numCirclesInBlockConservative - 1];
+        // //get the circle index in the block -- exact
+        // getcircleIdxTrue(tid, prefixSumInput, prefixSumOutput, inBlock);//exact idx is in prefixSumInput
+        // __syncthreads();
 
         
-        // shade particular pixel due to the exact circle in the block
-        for (int i = 0 ; i < numCirclesInBlockExact; i++){
-            circleIndex = prefixSumInput[i];
-            int index3 = 3 * circleIndex;
-            float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
-            shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
-        }
-        // for (int i = 0 ; i < numCirclesInBlockConservative; i++){
-        //     circleIndex = inBlock[i];
+        // // shade particular pixel due to the exact circle in the block
+        // for (int i = 0 ; i < numCirclesInBlockExact; i++){
+        //     circleIndex = prefixSumInput[i];
         //     int index3 = 3 * circleIndex;
         //     float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
         //     shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
         // }
+        for (int i = 0 ; i < numCirclesInBlockConservative; i++){
+            circleIndex = inBlock[i];
+            int index3 = 3 * circleIndex;
+            float3 p = *(float3*)(&cuConstRendererParams.position[index3]);
+            shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
+        }
         __syncthreads();
     }
     
@@ -798,13 +804,17 @@ CudaRenderer::advanceAnimation() {
 
 void
 CudaRenderer::render() {
-
-    // 256 threads per block is a healthy number
     dim3 blockDim(BLOCKDIM, BLOCKDIM);
     dim3 gridDim(
         (image->width + blockDim.x - 1) / blockDim.x,
         (image->height + blockDim.y - 1) / blockDim.y);
+    // 256 threads per block is a healthy number
+    if(numCircles>=BLOCKSIZE){
 
-    kernelRenderPixels<<<gridDim, blockDim>>>();
+        kernelRenderPixels<<<gridDim, blockDim>>>();
+    }
+    else{
+        naive_kernelRenderPixels<<<gridDim, blockDim>>>();
+    }
     cudaDeviceSynchronize();
 }
