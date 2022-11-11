@@ -15,7 +15,7 @@
 #include "util.h"
 
 #define BLOCKDIM 32
-#define BlOCKSIZE (BLOCKDIM*BLOCKDIM)
+#define BLOCKSIZE (BLOCKDIM*BLOCKDIM)
 #define SCAN_BLOCK_DIM BLOCKSIZE  // needed by sharedMemExclusiveScan implementation
 
 
@@ -62,6 +62,7 @@ __constant__ float  cuConstColorRamp[COLOR_MAP_SIZE][3];
 #include "lookupColor.cu_inl"
 #include "exclusiveScan.cu_inl"
 #include "circleBoxTest.cu_inl"
+
 
 // kernelClearImageSnowflake -- (CUDA device code)
 //
@@ -544,7 +545,7 @@ __global__ void kernelRenderPixels() {
     // float rad;
     // int index3;
      
-    for (int index = 0; index < cuConstRendererParams.numCircles; index += BlOCKSIZE) {
+    for (int index = 0; index < cuConstRendererParams.numCircles; index += BLOCKSIZE) {
         int circleIndex = index + tid;
         //circle in box conservative test 
         circleInBlockConservative(tid,circleIndex, boxL, boxR, boxT, boxB, prefixSumInput);
@@ -554,12 +555,12 @@ __global__ void kernelRenderPixels() {
         // prefixSumInput[tid] = static_cast<uint>(circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB));
         __syncthreads();
         //inclusive scan of the prefixSumInput to get the index of the circle in the block--conservative test
-        sharedMemInclusiveScan(tid, prefixSumInput, prefixSumOutput, prefixSumScratch,BlOCKSIZE);
+        sharedMemInclusiveScan(tid, prefixSumInput, prefixSumOutput, prefixSumScratch,BLOCKSIZE);
         __syncthreads();
         // if(tid==0 && index ==0){
         //     printf("first scan last element:%d\n",prefixSumOutput[BLOCKSIZE-1]);
         // }
-        int numCirclesInBlockConservative = prefixSumOutput[BlOCKSIZE - 1];
+        int numCirclesInBlockConservative = prefixSumOutput[BLOCKSIZE - 1];
         //get the circle index in the block -- conservative
         getcircleIdxConservative(tid, circleIndex, prefixSumOutput, inBlock);
         __syncthreads();
