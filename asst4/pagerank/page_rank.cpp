@@ -25,6 +25,7 @@ void pageRank(Graph g, double* solution, double damping, double convergence)
 
   int numNodes = num_nodes(g);
   double equal_prob = 1.0 / numNodes;
+  #pragma omp parallel for schedule(dynamic, 100)
   for (int i = 0; i < numNodes; ++i) {
     solution[i] = equal_prob;
   }
@@ -58,4 +59,58 @@ void pageRank(Graph g, double* solution, double damping, double convergence)
      }
 
    */
+  double* score_old = new double[numNodes];
+  bool converged = false;
+
+  //find those vertexes with no outgoing edges
+  int* no_out_vertexes = new int[numNodes];
+  int my_counter =0;
+  double one_minus_damping_term = (1.0-damping) / numNodes;
+  #pragma omp parallel for schedule(dynamic, 100)
+  for(int i=0 ; i<numNodes; i++){
+    if(outgoing_size(g,i)==0){
+      #pragma omp critical
+      {
+        no_out_vertexes[my_counter] = i;
+        my_counter++;
+      }
+    }
+  }
+  
+  while(!converged){
+    #pragma omp parallel for schedule(dynamic, 100)
+    for(int i = 0; i < numNodes; i++){
+      score_old[i] = solution[i];
+    }
+
+    double no_out_sum = 0;
+    #pragma omp parallel for reduction(+:no_out_sum) schedule(dynamic, 100)
+    for(int i = 0; i < my_counter; i++){
+      no_out_sum += score_old[no_out_vertexes[i]];
+    }
+    no_out_sum = damping*no_out_sum/numNodes;
+
+    #pragma omp parallel for schedule(dynamic, 100)
+    for(int i = 0; i < numNodes; i++){
+      solution[i] = 0;
+      const Vertex* in_begin = incoming_begin(g, i);
+      const Vertex* in_end = incoming_end(g, i);
+      for(const Vertex* v = in_begin; v != in_end; v++){
+        solution[i] += score_old[*v] / outgoing_size(g, *v);
+      }
+      solution[i] = (damping * solution[i]) + one_minus_damping_term + no_out_sum;
+    }
+
+    double global_diff = 0;
+    #pragma omp parallel for reduction(+:global_diff) schedule(dynamic, 100)
+    for(int i = 0; i < numNodes; i++){
+      global_diff += abs(solution[i] - score_old[i]);
+    }
+
+    converged = (global_diff < convergence);
+    // printf("global_diff: %f\n", global_diff);
+  }
+
+  delete [] no_out_vertexes;
+  delete [] score_old;
 }
