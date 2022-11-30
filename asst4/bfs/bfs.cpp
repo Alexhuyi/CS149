@@ -120,7 +120,7 @@ void bottom_up_step(
     {   
         int local_count = 0;
         int* local_frontier = new int[g->num_nodes];
-        #pragma omp for schedule(dynamic, 128)
+        #pragma omp for schedule(dynamic, 256)
         for(int i = 0; i < g->num_nodes; i++) {
             
             if(distances[i] == NOT_VISITED_MARKER) {
